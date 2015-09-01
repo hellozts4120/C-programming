@@ -47,7 +47,7 @@ public:
     int i,j;
     for(  i = 0;i < 3; ++i )
         for(  j = 0; j < 4; j ++ )
-            a[i][j] = i * 4 + j;
+            a[i][j] = i * 4 + j;	//只有[i]是跟着a的，故只有[i]中的[]需要重载，[j]中的[]默认为 return p+j
     for(  i = 0;i < 3; ++i ) {
         for(  j = 0; j < 4; j ++ ) {
             cout << a(i,j) << ",";
