@@ -176,7 +176,12 @@ int logicalShift(int x, int n)
 // Rating: 4
 int bitParity(int x)
 {
-	return 213;
+	x = (x >> 16) ^ x;
+	x = (x >> 8) ^ x;
+	x = (x >> 4) ^ x;
+	x = (x >> 2) ^ x;
+	x = (x >> 1) ^ x;
+	return x & 1;
 }
 
 // Returns a mask that marks the position of the least significant 1 bit of x
@@ -187,7 +192,7 @@ int bitParity(int x)
 // Rating: 4 
 int leastBitPos(int x) 
 {
-	return 213;
+	return (~x + 1) & x;
 }
 
 // Returns a count of the number of 1's in the argument.
@@ -197,7 +202,19 @@ int leastBitPos(int x)
 // Rating: 4
 int bitCount(int x) 
 {
-	return 213;
+	/*	Difficult, copy from the website, need to understand it!!	*/
+	int m1 = 0x11 | (0x11 << 8);
+  	int mask = m1 | (m1 << 16);
+  	int s = x & mask;
+  	s += (x >> 1) & mask;
+  	s += (x >> 2) & mask;
+  	s += (x >> 3) & mask;
+
+  	s = s + (s >> 16);
+  
+  	mask = 0xF | (0xF << 8);
+  	s = (s & mask) + ((s >> 4) & mask);
+  	return (s + (s >> 8)) & 0x3F;
 }
 
 // Compute !x without using ! operator.
@@ -207,7 +224,7 @@ int bitCount(int x)
 // Rating: 4 
 int bang(int x) 
 {
-	return 213;
+	return (~(((~x + 1) | x) >> 31)) & 1;
 }
 
 
@@ -221,7 +238,7 @@ int bang(int x)
 // Rating: 1
 int tmax(void) 
 {
-	return 213;
+	return ~(1 << 31);
 }
 
 // Compute -x without using - operator.
@@ -231,7 +248,7 @@ int tmax(void)
 // Rating: 2
 int negate(int x) 
 {
-	return 213;
+	return ~x + 1;
 }
 
 // Determines whether argument y can be added to argument x without overflow.
@@ -241,7 +258,10 @@ int negate(int x)
 // Rating: 3
 int addOK(int x, int y) 
 {
-	return 213;
+	int signX = x >> 31;
+	int signY = y >> 31;
+	int signSum = (x + y) >> 31;
+	return !((~(signX ^ signY)) & (signY ^ signSum));
 }
 
 // Check whether x is nonzero using the legal operators except !
@@ -251,7 +271,7 @@ int addOK(int x, int y)
 // Rating: 4 
 int isNonZero(int x)
 {
-	return 213;
+	return (((~x + 1) | x) >> 31) & 1;
 }
 
 // Converts a number from sign-magnitude format to two’s complement format. 
@@ -274,7 +294,9 @@ int sm2tc(int x)
 // Rating: 4
 int abs(int x) 
 {
-	return 213;
+	int sign = x >> 31;
+	return (x + sign) ^ sign;
+	/* 	or: return (x ^ sign) - sign;	*/		
 }
 
 // Adds two values and if the result (x+y) has a positive overflow it returns
@@ -288,5 +310,7 @@ int abs(int x)
 // Rating: 4
 int satAdd(int x, int y) 
 {
-	return 213;
+	int sum = x + y;
+	int overflowSign = ((x ^ sum) & (y ^ sum)) >> 31;
+	return (sum >> (overflowSign & 31)) + (overflowSign << 31);
 }
