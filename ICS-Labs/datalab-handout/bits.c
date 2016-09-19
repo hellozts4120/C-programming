@@ -332,7 +332,48 @@ unsigned float_abs(unsigned uf) {
  *   Rating: 4
  */
 unsigned float_i2f(int x) {
-    return 2;
+    unsigned s, exp, frac;
+    unsigned abs;
+    unsigned e, temp, tail, flag;
+    if (x == 0) {
+        return x;
+    } else if (x < 0) { // get s and absolute value;
+        s = 0x80000000;
+        abs = -x;
+    } else { // get s and absolute value;
+        s = 0;
+        abs = x;
+    }
+    
+    e = 0;
+    temp = abs;
+    while (temp = (temp >> 1)) {
+        e = e + 1; // get the exponent number
+    }
+    // pre-handle the frac
+    frac = abs << (32 - e);
+    tail = frac & 0x1ff;
+    frac = frac >> 9;
+    
+    // round the frac, handle special case.
+    flag = 0;
+    if (tail > 256) {
+        flag = 1;
+    } else if (tail == 256) {
+        if (frac & 1) {
+            flag = 1;
+        }
+    }
+    if (flag) {
+        frac = frac + 1;
+    }
+    if (frac == 0x800000) {
+        frac = 0;
+        e = e + 1;
+    }
+    
+    exp = 127 + e;
+    return s | (exp << 23) | frac;
 }
 /* 
  * float_times64 - Return bit-level equivalent of expression 64*f for
@@ -346,5 +387,46 @@ unsigned float_i2f(int x) {
  *   Rating: 4
  */
 unsigned float_times64(unsigned uf) {
-    return 2;
+    unsigned s, exp, frac;
+    unsigned i;
+    
+    // get s, exp, frac...
+    s = uf & 0x80000000;
+    exp = uf & 0x7f800000;
+    frac = uf & 0x7fffff;
+    
+    // if exp == 0x7f800000, there must be NaN happens...
+    if (exp == 0x7f800000) {
+        return uf;
+    }
+
+    // exp not 0, Normalized Number
+    if (exp) {
+        // handle cases when overflow happens after (exp + 6)...
+        if (exp >= 0x7c800000) {
+            if (s) {
+                return 0xff800000;
+            } else {
+                return 0x7f800000;
+            }
+        }
+        
+        // no overflow after (exp + 6)
+        exp = exp + 0x3000000;
+        return s | exp | frac;
+    }
+    
+    // Denormalized Number
+    if ((frac << 6) <= 0x7fffff) {
+        return s | (frac << 6); // frac * 64 not overflow, use it instead...
+    }
+    
+    i = 0;
+    while (frac <= 0x7fffff) {
+        frac = frac << 1;
+        i = i + 1;
+    }
+    frac = frac & 0x7fffff;
+    exp = ((7 - i) << 23) + exp;
+    return s | exp | frac;
 }
