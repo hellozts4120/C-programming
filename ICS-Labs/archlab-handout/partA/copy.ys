@@ -1,0 +1,42 @@
+# 14307110190 Tianshu Zhou
+
+.pos 0
+irmovq stack, %rsp
+irmovq src, %rdi
+irmovq dest, %rsi
+irmovq $3, %rbx    #len
+call copy_block
+halt
+
+.align 8
+# Source block
+src:
+    .quad 0x00a
+    .quad 0x0b0
+    .quad 0xc00
+# Destination block
+dest:
+    .quad 0x111
+    .quad 0x222
+    .quad 0x333
+    
+copy_block:
+    irmovq $1, %r8   #(len--) per iteration
+    irmovq $8, %r9
+    irmovq $0, %rax  #result 
+    andq %rbx, %rbx
+    jg loop
+
+loop:
+    mrmovq (%rdi), %r10
+    rmmovq %r10, (%rsi)
+    addq %r9, %rdi
+    addq %r9, %rsi
+    xorq %r10, %rax
+    subq %r8, %rbx
+    andq %rbx, %rbx
+    jg loop
+
+    .pos 0x400
+stack:
+
