@@ -12,12 +12,13 @@
 
 /* You won't lose style points for including this long line in your code */
 static const char *user_agent_hdr = "User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:10.0.3) Gecko/20120305 Firefox/10.0.3\r\n";
-static const char *accept_hdr = "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\r\n";
-static const char *accept_encoding_hdr = "Accept-Encoding: gzip, deflate\r\n";
+// static const char *accept_hdr = "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\r\n";
+// static const char *accept_encoding_hdr = "Accept-Encoding: gzip, deflate\r\n";
 static const char *conn_hdr = "Connection: close\r\n";
 static const char *proxy_hdr = "Proxy-Connection: close\r\n";
 
 int is_valid_http(char *buf);
+void *thread(void *vargp);
 void doit(int fd);
 int read_request(rio_t *rp, char *request);
 void forward_response(rio_t *rp, int client_fd);
@@ -25,10 +26,12 @@ void parse_uri(char *uri, char *host, char *port);
 void clienterror(int fd, char *cause, char *errnum, char *shortmsg, char *longmsg);
 
 int main(int argc, char **argv) {
-    int listenfd, connfd;
-    char hostname[MAXLINE], port[MAXLINE];
+    int listenfd;
+    int *connfd;
+    char host[MAXLINE], port[MAXLINE];
     struct sockaddr_in clientaddr;
-    socklen_t clientlen = sizeof(clientaddr);
+    socklen_t clientaddr_len = sizeof(clientaddr);
+    pthread_t tid;
 
     /* check command line args */
     if (argc != 2) {
@@ -42,14 +45,16 @@ int main(int argc, char **argv) {
     listenfd = Open_listenfd(argv[1]);
     while (1) {
         /* listen for incoming connections */
-        connfd = Accept(listenfd, (SA *)&clientaddr, &clientlen);
-        Getnameinfo((SA *)&clientaddr, clientlen, hostname, MAXLINE, 
+        connfd = malloc(sizeof(int));
+        *connfd = Accept(listenfd, (SA *)&clientaddr, &clientaddr_len);
+        Getnameinfo((SA *)&clientaddr, clientaddr_len, host, MAXLINE, 
                      port, MAXLINE, 0);
-        printf("Accepted connection from (%s, %s)\n", hostname, port);
+        printf("Accepted connection from (%s, %s)\n", host, port);
         /* service the request accordingly */
-        doit(connfd);
+        // doit(connfd);
         /* close the connection */
-        Close(connfd);
+        // Close(connfd);
+        Pthread_create(&tid, NULL, thread, connfd);
     }
     return 0;
 }
@@ -71,6 +76,22 @@ int is_valid_http(char *buf) {
         }
     }
     return 0;
+}
+
+/*
+ * thread - new a thread for one specific request
+ */
+void *thread(void *vargp) {
+    int connfd;
+
+    /* detach the thread for automatic reap */
+    Pthread_detach(Pthread_self());
+    connfd = *((int *)vargp);
+    free(vargp);
+    doit(connfd);
+    Close(connfd);
+    
+    return NULL;
 }
 
 /*
@@ -180,9 +201,8 @@ int read_request(rio_t *rp, char *request) {
  * forwards server's response to client
  */
 /* $begin forward_response */
-void forward_response(rio_t *rp, int client_fd) {
+void forward_response(rio_t *rp, int client_fd) { // TODO
     char buf[MAXBUF], hdr_name[MAXLINE], hdr_data[MAXLINE];
-    char *buf_p;
     int bytes;
     int content_length = 0;
     char content_type[MAXLINE];
@@ -231,25 +251,19 @@ void forward_response(rio_t *rp, int client_fd) {
 
     /* forward response body */
     printf("forward response body begin...\n");
-    if (content_length) {
-        buf_p = malloc(content_length);
-        bytes = rio_readnb(rp, buf_p, content_length);
+    while (1) {
+        bytes = rio_readnb(rp, buf, content_length);
         if (bytes <= 0) {
             printf("read response body failed or EOF encoutnered\n");
-            free(buf_p);
             return;
         } 
-        bytes = rio_writen(client_fd, buf_p, content_length);
+        bytes = rio_writen(client_fd, buf, content_length);
         if (bytes <=0) {
             printf("write response body failed\n");
-            free(buf_p);
             return;
         }
         printf("write %d bytes to client\n", bytes);
-        free(buf_p);   
     }
-    else
-        printf("content length not found!");
 }
 /* $end forward_response */
 
